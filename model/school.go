@@ -14,7 +14,7 @@ type School struct {
 	State     string    `json:"state" binding:"required" gorm:"not null"`
 	Contact   string    `json:"contact" binding:"required" gorm:"not null"`
 	Image     string    `json:"image"`
-	Email     string    `json:"email" binding:"required,email" gorm:"not null;uniqueIndex"`
+	Email     string    `json:"email" binding:"required,email" gorm:"type:VARCHAR(255);not null;uniqueIndex"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
