@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -43,10 +44,23 @@ func GetSchoolByID(c *gin.Context) {
 }
 
 func CreateSchool(c *gin.Context) {
-	// Parse multipart form
-	if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Could not parse form"})
+
+	if err := c.Request.ParseMultipartForm(20 << 20); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Could not parse form: " + err.Error()})
 		return
+	}
+
+	fmt.Println("Form parsed successfully")
+	fmt.Println("Form values:", c.Request.PostForm)
+
+	// Check if file exists
+	file, fileHeader, err := c.Request.FormFile("schoolImage")
+	if err != nil {
+		fmt.Println("No schoolImage file found:", err)
+	} else {
+		defer file.Close()
+		fmt.Printf("File received: %s, Size: %d bytes, Type: %s\n",
+			fileHeader.Filename, fileHeader.Size, fileHeader.Header.Get("Content-Type"))
 	}
 
 	// Get form values
@@ -57,11 +71,21 @@ func CreateSchool(c *gin.Context) {
 	state := c.PostForm("state")
 	contactNumber := c.PostForm("contactNumber")
 
-	// Handle image upload
-	imagePath, err := utils.UploadSchoolImage(c, schoolName, emailAddress, contactNumber)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
-		return
+	fmt.Printf("Form data: %s, %s, %s, %s, %s, %s\n",
+		schoolName, emailAddress, address, city, state, contactNumber)
+
+	var imagePath string
+	var uploadErr error
+
+	// Check if image was uploaded
+	if _, _, err := c.Request.FormFile("schoolImage"); err == nil {
+		imagePath, uploadErr = utils.UploadSchoolImage(c)
+		if uploadErr != nil {
+			fmt.Println("Image upload error:", uploadErr)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image: " + uploadErr.Error()})
+			return
+		}
+		fmt.Println("Image uploaded successfully:", imagePath)
 	}
 
 	// Create school model
@@ -72,14 +96,18 @@ func CreateSchool(c *gin.Context) {
 		City:    city,
 		State:   state,
 		Contact: contactNumber,
-		Image:   imagePath,
+		Image:   imagePath, // This can be empty if no image was uploaded
 	}
 
 	if err := config.DB.Create(&school).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create school"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create school: " + err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"data": school})
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "School created successfully",
+		"data":    school,
+	})
 }
 
 func UpdateSchool(c *gin.Context) {
@@ -105,10 +133,17 @@ func UpdateSchool(c *gin.Context) {
 	state := c.PostForm("state")
 	contactNumber := c.PostForm("contactNumber")
 
-	imagePath, err := utils.UploadSchoolImage(c, schoolName, emailAddress, contactNumber)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
-		return
+	var imagePath string
+	var uploadErr error
+
+	if _, _, err := c.Request.FormFile("schoolImage"); err == nil {
+		imagePath, uploadErr = utils.UploadSchoolImage(c)
+		if uploadErr != nil {
+			fmt.Println("Image upload error:", uploadErr)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image: " + uploadErr.Error()})
+			return
+		}
+		fmt.Println("Image uploaded successfully:", imagePath)
 	}
 
 	// Update fields

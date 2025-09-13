@@ -38,9 +38,10 @@ func main() {
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     allowOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "X-CSRF-Token", "Cache-Control", "X-Requested-With"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Accept", "X-Requested-With", "X-CSRF-Token"},
+		ExposeHeaders:    []string{"Content-Length", "Authorization"},
 		AllowCredentials: true,
-		MaxAge:           12 * time.Hour, // Preflight result cache duration
+		MaxAge:           12 * time.Hour,
 	}))
 
 	// School routes

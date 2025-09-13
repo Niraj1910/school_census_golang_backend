@@ -104,8 +104,20 @@ func Login(c *gin.Context) {
 
 	// Set JWT in HTTP-only cookie
 	isProduction := os.Getenv("ENV") == "production"
-	c.SetCookie("jwt", tokenString, int(time.Hour*24/time.Second), "/", "", isProduction, true)
-	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
+	domain := "localhost"
+	if isProduction {
+		domain = os.Getenv("CLIENT_URL")
+	}
+	c.SetCookie("jwt", tokenString, int(time.Hour*24/time.Second), "/", domain, isProduction, true)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Login successful",
+		"token":   tokenString,
+		"user": gin.H{
+			"email": user.Email,
+			"id":    user.ID,
+		},
+	})
 }
 
 func Logout(c *gin.Context) {
@@ -117,17 +129,22 @@ func Logout(c *gin.Context) {
 // JWTMiddleware validates JWT from cookie
 func JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+
+		fmt.Println("Request URL:", c.Request.URL.Path)
+		fmt.Println("Request Method:", c.Request.Method)
+		fmt.Println("Authorization Header:", c.GetHeader("Authorization"))
+
 		var tokenString string
 		var err error
 
-		// Check for JWT in cookie
-		tokenString, err = c.Cookie("jwt")
-		if err != nil {
-			// Fallback to Authorization header
-			authHeader := c.GetHeader("Authorization")
-			if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
-				tokenString = strings.TrimPrefix(authHeader, "Bearer ")
-			} else {
+		// First check Authorization header
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
+			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+		} else {
+			// Fallback to checking JWT in cookie
+			tokenString, err = c.Cookie("jwt")
+			if err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 				c.Abort()
 				return
