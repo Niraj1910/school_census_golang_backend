@@ -8,7 +8,8 @@ import (
 func RegisterAuthRoutes(router *gin.Engine) {
 	auth := router.Group("/api/auth")
 	{
-		auth.GET("/otp", controllers.SendOTP)
-		auth.POST("/otp/verify", controllers.VerifyOTP)
+		auth.POST("/register", controllers.Register)
+		auth.POST("/login", controllers.Login)
+		auth.POST("/logout", controllers.Logout)
 	}
 }

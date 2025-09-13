@@ -29,13 +29,14 @@ func main() {
 	// Initialize the Gin router
 	router := gin.Default()
 
-	// Basic middleware
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
+	allowOrigins := []string{"http://localhost:3000"}
+	if clientURL := os.Getenv("CLIENT_URL"); clientURL != "" {
+		allowOrigins = append(allowOrigins, clientURL)
+	}
 
 	// CORS: middleware
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"}, // Your Next.js origin
+		AllowOrigins:     allowOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "X-CSRF-Token", "Cache-Control", "X-Requested-With"},
 		AllowCredentials: true,

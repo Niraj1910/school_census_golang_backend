@@ -6,7 +6,7 @@ import (
 )
 
 func RegisterSchoolRoutes(router *gin.Engine) {
-	school := router.Group("/api/schools")
+	school := router.Group("/api/schools").Use(controllers.JWTMiddleware())
 	{
 		school.GET("/", controllers.GetSchools)
 		school.GET("/:id", controllers.GetSchoolByID)

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Niraj1910/school-census-go-backend/model"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -25,5 +26,9 @@ func ConnectDB() {
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database: ", err)
+	}
+
+	if err := model.AutoMigrate(DB); err != nil {
+		log.Fatal("Failed to run migrations: ", err)
 	}
 }
