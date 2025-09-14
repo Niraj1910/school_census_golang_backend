@@ -28,3 +28,6 @@ A high-performance, secure backend API for a School Census Management System bui
    git clone https://github.com/your-username/school-census-backend.git
    cd school-census-backend
 ```
+2. ** Install packages**
+go mod tidy
+go run .
