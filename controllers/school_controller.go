@@ -15,7 +15,7 @@ func GetSchools(c *gin.Context) {
 
 	var schools []model.School
 
-	if err := config.DB.Find(&schools).Error; err != nil {
+	if err := config.DB.Order("created_at DESC").Find(&schools).Error; err != nil {
 		log.Printf("Database error in GetSchools: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve schools"})
 		return
@@ -43,24 +43,11 @@ func GetSchoolByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": school})
 }
 
+// CreateSchool.go
 func CreateSchool(c *gin.Context) {
-
 	if err := c.Request.ParseMultipartForm(20 << 20); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Could not parse form: " + err.Error()})
 		return
-	}
-
-	fmt.Println("Form parsed successfully")
-	fmt.Println("Form values:", c.Request.PostForm)
-
-	// Check if file exists
-	file, fileHeader, err := c.Request.FormFile("schoolImage")
-	if err != nil {
-		fmt.Println("No schoolImage file found:", err)
-	} else {
-		defer file.Close()
-		fmt.Printf("File received: %s, Size: %d bytes, Type: %s\n",
-			fileHeader.Filename, fileHeader.Size, fileHeader.Header.Get("Content-Type"))
 	}
 
 	// Get form values
@@ -71,21 +58,26 @@ func CreateSchool(c *gin.Context) {
 	state := c.PostForm("state")
 	contactNumber := c.PostForm("contactNumber")
 
-	fmt.Printf("Form data: %s, %s, %s, %s, %s, %s\n",
-		schoolName, emailAddress, address, city, state, contactNumber)
-
 	var imagePath string
-	var uploadErr error
 
 	// Check if image was uploaded
-	if _, _, err := c.Request.FormFile("schoolImage"); err == nil {
-		imagePath, uploadErr = utils.UploadSchoolImage(c)
-		if uploadErr != nil {
-			fmt.Println("Image upload error:", uploadErr)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image: " + uploadErr.Error()})
+	fileHeader, err := c.FormFile("schoolImage")
+	if err == nil {
+		// Save file locally first
+		if err := utils.SaveFileLocally(c, fileHeader); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image locally: " + err.Error()})
+			return
+		}
+
+		// Upload to Cloudinary
+		imagePath, err = utils.UploadToCloudinary(fileHeader, schoolName, emailAddress, contactNumber)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image: " + err.Error()})
 			return
 		}
 		fmt.Println("Image uploaded successfully:", imagePath)
+	} else {
+		fmt.Println("No schoolImage file found:", err)
 	}
 
 	// Create school model
@@ -96,7 +88,7 @@ func CreateSchool(c *gin.Context) {
 		City:    city,
 		State:   state,
 		Contact: contactNumber,
-		Image:   imagePath, // This can be empty if no image was uploaded
+		Image:   imagePath,
 	}
 
 	if err := config.DB.Create(&school).Error; err != nil {
@@ -133,17 +125,25 @@ func UpdateSchool(c *gin.Context) {
 	state := c.PostForm("state")
 	contactNumber := c.PostForm("contactNumber")
 
+	// Check if a new image was uploaded
 	var imagePath string
-	var uploadErr error
+	fileHeader, err := c.FormFile("schoolImage")
+	if err == nil {
+		// Save file locally first
+		if err := utils.SaveFileLocally(c, fileHeader); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image locally: " + err.Error()})
+			return
+		}
 
-	if _, _, err := c.Request.FormFile("schoolImage"); err == nil {
-		imagePath, uploadErr = utils.UploadSchoolImage(c)
-		if uploadErr != nil {
-			fmt.Println("Image upload error:", uploadErr)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image: " + uploadErr.Error()})
+		// Upload to Cloudinary
+		imagePath, err = utils.UploadToCloudinary(fileHeader, schoolName, emailAddress, contactNumber)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image: " + err.Error()})
 			return
 		}
 		fmt.Println("Image uploaded successfully:", imagePath)
+	} else {
+		fmt.Println("No new image uploaded, keeping existing image")
 	}
 
 	// Update fields
@@ -153,6 +153,8 @@ func UpdateSchool(c *gin.Context) {
 	school.City = city
 	school.State = state
 	school.Contact = contactNumber
+
+	// Only update image if a new one was uploaded
 	if imagePath != "" {
 		school.Image = imagePath
 	}
